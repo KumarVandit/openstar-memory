@@ -13,7 +13,8 @@ Never lose track of why you starred that repo. Get instant context when you need
 - 📝 **Markdown Export** - Clean, chronological markdown file
 - 🔧 **MCP Server** - Works with Claude Desktop, Cursor, and other MCP clients
 - 🐳 **Docker Ready** - Deploy locally or in containers
-- ⚙️ **Multi-User** - Configurable for any GitHub username
+- ⚙️ **Auto-Detection** - Automatically detects repo from git remote
+- 🚀 **Zero Config** - Just add your GitHub username and token!
 
 ---
 
@@ -22,35 +23,39 @@ Never lose track of why you starred that repo. Get instant context when you need
 ### Prerequisites
 - Python 3.9+
 - GitHub Personal Access Token ([Generate here](https://github.com/settings/tokens))
+  - Required scopes: `repo` (or `public_repo`), `read:user`
 - Supermemory API Key (optional, for knowledge graph)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/KumarVandit/openstar-memory.git
+git clone https://github.com/YOUR_USERNAME/openstar-memory.git
 cd openstar-memory
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
+# Configure (only 2 required values!)
 cp .env.example .env
-# Edit .env with your credentials
+# Edit .env:
+#   GITHUB_USERNAME=your_username
+#   GITHUB_TOKEN=ghp_your_token
 ```
 
 ### Configuration
 
-Edit `.env`:
+Edit `.env` - **Only 2 values required:**
 
 ```bash
 GITHUB_USERNAME=your_github_username
 GITHUB_TOKEN=ghp_your_token_here
-SUPERMEMORY_API_KEY=your_supermemory_api_key  # Optional
-SUPERMEMORY_API_URL=https://api.supermemory.ai  # Optional
-REPO_OWNER=KumarVandit  # Where to commit the markdown
-REPO_NAME=openstar-memory
+
+# Optional
+SUPERMEMORY_API_KEY=your_key  # Leave empty to skip
 ```
+
+✨ **That's it!** The script automatically detects which repo it's running in.
 
 ---
 
@@ -122,7 +127,7 @@ Configure similarly using the MCP protocol.
 
 ```
 openstar-memory/
-├── sync_stars.py          # Main sync script
+├── sync_stars.py          # Main sync script (auto-detects repo)
 ├── mcp_server.py          # MCP server implementation
 ├── requirements.txt       # Python dependencies
 ├── Dockerfile             # Docker container
@@ -167,6 +172,19 @@ Production Ready Toolset for AI Agents
 
 ---
 ```
+
+---
+
+## ❓ FAQ
+
+### Why is repo detection automatic?
+The script reads your git remote URL and automatically determines where to commit the markdown. No manual configuration needed!
+
+### Can I use this for multiple GitHub accounts?
+Yes! Just fork the repo for each account, configure different `.env` files, and run them separately.
+
+### What if I want to commit to a different repo?
+Fork this repo, change the git remote, and the script will auto-detect the new destination.
 
 ---
 
