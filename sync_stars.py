@@ -2,6 +2,10 @@
 """
 OpenStar Memory - GitHub Stars Sync Script
 Fetches starred repos and syncs to markdown + Supermemory
+
+Modes:
+  1. Local Mode (no token): Generates markdown locally
+  2. Auto-Commit Mode (token required): Commits to GitHub repo
 """
 
 import os
@@ -15,7 +19,7 @@ import requests
 
 # Configuration from environment
 GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")  # Optional!
 SUPERMEMORY_API_KEY = os.environ.get("SUPERMEMORY_API_KEY", "")
 SUPERMEMORY_API_URL = os.environ.get("SUPERMEMORY_API_URL", "https://api.supermemory.ai")
 
@@ -23,7 +27,7 @@ def log(msg: str):
     """Timestamped logging"""
     print(f"[{datetime.utcnow().isoformat()}] {msg}")
 
-def get_repo_info() -> Tuple[str, str]:
+def get_repo_info() -> Optional[Tuple[str, str]]:
     """Auto-detect repo owner and name from git remote"""
     try:
         # Get git remote URL
@@ -36,10 +40,6 @@ def get_repo_info() -> Tuple[str, str]:
         remote_url = result.stdout.strip()
         
         # Parse owner/repo from various GitHub URL formats
-        # git@github.com:owner/repo.git
-        # https://github.com/owner/repo.git
-        # https://github.com/owner/repo
-        
         patterns = [
             r'github\.com[:/]([^/]+)/([^/.]+)(?:\.git)?$',
         ]
@@ -51,33 +51,43 @@ def get_repo_info() -> Tuple[str, str]:
                 log(f"Auto-detected repo: {owner}/{repo}")
                 return owner, repo
         
-        raise ValueError(f"Could not parse GitHub repo from remote URL: {remote_url}")
+        log(f"Could not parse GitHub repo from remote URL: {remote_url}")
+        return None
     
     except subprocess.CalledProcessError:
-        raise ValueError("Not a git repository or no remote.origin.url configured")
+        log("Not a git repository or no remote.origin.url configured")
+        return None
 
-def fetch_all_starred_repos() -> List[Dict[str, Any]]:
+def fetch_all_starred_repos(username: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
     """Fetch all starred repositories with pagination"""
-    log("Fetching starred repositories...")
+    log(f"Fetching starred repositories for @{username}...")
     
-    if not GITHUB_USERNAME or not GITHUB_TOKEN:
-        raise ValueError("GITHUB_USERNAME and GITHUB_TOKEN must be set")
+    if not username:
+        raise ValueError("GITHUB_USERNAME must be set")
     
     headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.star+json"  # Include star timestamps
     }
+    
+    # Add token if provided (for higher rate limits)
+    if token:
+        headers["Authorization"] = f"token {token}"
+        log("Using authenticated requests (higher rate limit)")
+    else:
+        log("Using unauthenticated requests (60 req/hour limit)")
     
     all_repos = []
     page = 1
     per_page = 100
     
     while True:
-        url = f"https://api.github.com/users/{GITHUB_USERNAME}/starred?per_page={per_page}&page={page}"
+        url = f"https://api.github.com/users/{username}/starred?per_page={per_page}&page={page}"
         response = requests.get(url, headers=headers)
         
         if response.status_code != 200:
             log(f"Error fetching stars: {response.status_code} - {response.text}")
+            if response.status_code == 403:
+                log("Rate limit exceeded. Consider adding GITHUB_TOKEN for higher limits.")
             break
         
         repos = response.json()
@@ -95,14 +105,14 @@ def fetch_all_starred_repos() -> List[Dict[str, Any]]:
     log(f"Total starred repos fetched: {len(all_repos)}")
     return all_repos
 
-def generate_markdown(repos: List[Dict[str, Any]]) -> str:
+def generate_markdown(repos: List[Dict[str, Any]], username: str) -> str:
     """Generate markdown content from starred repos"""
     log("Generating markdown...")
     
     # Sort by starred_at date (most recent first) - chronological order
     repos_sorted = sorted(repos, key=lambda x: x.get("starred_at", ""), reverse=True)
     
-    md_content = f"""# GitHub Starred Repositories
+    md_content = f"""# {username}'s GitHub Stars
 
 Last updated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")} UTC
 
@@ -148,15 +158,22 @@ Total stars: {len(repos)}
     
     return md_content
 
-def update_github_file(owner: str, repo: str, content: str, file_path: str = "starred-repos.md"):
+def save_markdown_locally(content: str, filename: str = "starred-repos.md"):
+    """Save markdown file locally"""
+    log(f"Saving markdown to {filename}...")
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(content)
+    log(f"✅ Saved to {filename}")
+
+def update_github_file(owner: str, repo: str, content: str, token: str, file_path: str = "starred-repos.md"):
     """Update or create file in GitHub repository"""
-    log(f"Updating {file_path} in {owner}/{repo}...")
+    log(f"Committing {file_path} to {owner}/{repo}...")
     
-    if not GITHUB_TOKEN:
-        raise ValueError("GITHUB_TOKEN must be set")
+    if not token:
+        raise ValueError("GITHUB_TOKEN is required for auto-commit mode")
     
     headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
+        "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
     
@@ -187,13 +204,13 @@ def update_github_file(owner: str, repo: str, content: str, file_path: str = "st
     response = requests.put(url, headers=headers, json=payload)
     
     if response.status_code in [200, 201]:
-        log("✅ File updated successfully")
+        log("✅ File committed successfully")
         result = response.json()
         commit_url = result.get("commit", {}).get("html_url", "")
         log(f"Commit: {commit_url}")
         return True
     else:
-        log(f"❌ Error updating file: {response.status_code} - {response.text}")
+        log(f"❌ Error committing file: {response.status_code} - {response.text}")
         return False
 
 def sync_to_supermemory(repos: List[Dict[str, Any]]):
@@ -234,27 +251,44 @@ def main():
     log("🌟 OpenStar Memory - Starting sync...")
     
     try:
-        # Auto-detect repo from git remote
-        repo_owner, repo_name = get_repo_info()
+        # Check if we have a username
+        if not GITHUB_USERNAME:
+            raise ValueError("GITHUB_USERNAME must be set in .env")
+        
+        # Determine mode
+        repo_info = get_repo_info()
+        auto_commit_mode = bool(GITHUB_TOKEN and repo_info)
+        
+        if auto_commit_mode:
+            repo_owner, repo_name = repo_info
+            log(f"🚀 Mode: AUTO-COMMIT (will commit to {repo_owner}/{repo_name})")
+        else:
+            log("📝 Mode: LOCAL-ONLY (no token or not in git repo)")
+            if not GITHUB_TOKEN:
+                log("   ℹ️  Add GITHUB_TOKEN to .env for auto-commit mode")
+            if not repo_info:
+                log("   ℹ️  Run from a git repo with GitHub remote for auto-commit")
         
         # 1. Fetch starred repos
-        repos = fetch_all_starred_repos()
+        repos = fetch_all_starred_repos(GITHUB_USERNAME, GITHUB_TOKEN)
         
         if not repos:
             log("❌ No starred repos found")
             return
         
         # 2. Generate markdown
-        markdown_content = generate_markdown(repos)
+        markdown_content = generate_markdown(repos, GITHUB_USERNAME)
         
-        # 3. Update GitHub file
-        success = update_github_file(repo_owner, repo_name, markdown_content)
+        # 3. Save locally (always)
+        save_markdown_locally(markdown_content)
         
-        if not success:
-            log("❌ Failed to update GitHub file")
-            return
+        # 4. Commit to GitHub (if in auto-commit mode)
+        if auto_commit_mode:
+            success = update_github_file(repo_owner, repo_name, markdown_content, GITHUB_TOKEN)
+            if not success:
+                log("⚠️  Failed to commit to GitHub, but file is saved locally")
         
-        # 4. Sync to Supermemory
+        # 5. Sync to Supermemory (optional)
         sync_to_supermemory(repos)
         
         log("🎉 Sync completed successfully!")
@@ -262,8 +296,13 @@ def main():
         # Output summary
         print(f"\n📊 Summary:")
         print(f"   Total starred repos: {len(repos)}")
-        print(f"   Markdown file: https://github.com/{repo_owner}/{repo_name}/blob/main/starred-repos.md")
-        print(f"   Raw URL: https://raw.githubusercontent.com/{repo_owner}/{repo_name}/main/starred-repos.md")
+        print(f"   Local file: ./starred-repos.md")
+        
+        if auto_commit_mode:
+            print(f"   GitHub: https://github.com/{repo_owner}/{repo_name}/blob/main/starred-repos.md")
+            print(f"   Raw URL: https://raw.githubusercontent.com/{repo_owner}/{repo_name}/main/starred-repos.md")
+        else:
+            print(f"   💡 Tip: Add GITHUB_TOKEN to auto-commit to your repo!")
         
     except Exception as e:
         log(f"❌ Error: {str(e)}")
