@@ -6,6 +6,7 @@ Fetches starred repos and syncs to markdown + Supermemory
 Modes:
   1. Local Mode (no token): Generates markdown locally
   2. Auto-Commit Mode (token required): Commits to GitHub repo
+  3. Supermemory Mode (API key): Syncs to Supermemory knowledge graph
 """
 
 import os
@@ -21,7 +22,7 @@ import requests
 GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")  # Optional!
 SUPERMEMORY_API_KEY = os.environ.get("SUPERMEMORY_API_KEY", "")
-SUPERMEMORY_API_URL = os.environ.get("SUPERMEMORY_API_URL", "https://api.supermemory.ai")
+SUPERMEMORY_API_URL = os.environ.get("SUPERMEMORY_API_URL", "https://api.supermemory.ai/api/v1")
 
 def log(msg: str):
     """Timestamped logging"""
@@ -213,38 +214,85 @@ def update_github_file(owner: str, repo: str, content: str, token: str, file_pat
         log(f"❌ Error committing file: {response.status_code} - {response.text}")
         return False
 
-def sync_to_supermemory(repos: List[Dict[str, Any]]):
+def sync_to_supermemory(repos: List[Dict[str, Any]], username: str) -> int:
     """Sync starred repos to Supermemory knowledge graph"""
     if not SUPERMEMORY_API_KEY:
         log("ℹ️  SUPERMEMORY_API_KEY not set, skipping Supermemory sync")
-        return
+        return 0
     
-    log("Syncing to Supermemory...")
+    log(f"Syncing {len(repos)} repos to Supermemory...")
     
-    # TODO: Implement Supermemory API integration
-    # This is a placeholder - adjust based on actual Supermemory API
     headers = {
         "Authorization": f"Bearer {SUPERMEMORY_API_KEY}",
         "Content-Type": "application/json"
     }
     
+    success_count = 0
+    failed_count = 0
+    
     for item in repos:
         repo = item.get("repo", item)
         
-        # Prepare memory entry
-        memory_data = {
-            "content": f"{repo.get('full_name')}: {repo.get('description', '')}",
-            "url": repo.get("html_url", ""),
-            "tags": repo.get("topics", []) + [repo.get("language", "")],
-            "timestamp": item.get("starred_at", datetime.utcnow().isoformat())
+        # Prepare content for Supermemory
+        name = repo.get("full_name", "Unknown")
+        description = repo.get("description") or "No description"
+        url = repo.get("html_url", "")
+        language = repo.get("language") or "Unknown"
+        topics = repo.get("topics", [])
+        stars = repo.get("stargazers_count", 0)
+        starred_at = item.get("starred_at", "")
+        
+        # Create rich content for semantic search
+        content = f"""GitHub Repository: {name}
+
+{description}
+
+Programming Language: {language}
+Stars: {stars:,}
+Topics: {', '.join(topics) if topics else 'None'}
+Starred by @{username} on {starred_at}
+
+URL: {url}
+"""
+        
+        # Supermemory API payload
+        # Based on Supermemory API docs: https://docs.supermemory.ai
+        payload = {
+            "content": content,
+            "type": "document",
+            "metadata": {
+                "title": name,
+                "url": url,
+                "source": "github-stars",
+                "language": language,
+                "topics": topics,
+                "stars": stars,
+                "starred_at": starred_at,
+                "starred_by": username
+            }
         }
         
-        # Send to Supermemory (adjust endpoint based on actual API)
-        # response = requests.post(f"{SUPERMEMORY_API_URL}/memories", headers=headers, json=memory_data)
-        # if response.status_code != 200:
-        #     log(f"Warning: Failed to sync {repo.get('full_name')} to Supermemory")
+        try:
+            # Add to Supermemory
+            response = requests.post(
+                f"{SUPERMEMORY_API_URL}/add",
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code in [200, 201]:
+                success_count += 1
+            else:
+                failed_count += 1
+                log(f"  ⚠️ Failed to sync {name}: {response.status_code}")
+        
+        except Exception as e:
+            failed_count += 1
+            log(f"  ⚠️ Error syncing {name}: {str(e)}")
     
-    log("✅ Supermemory sync complete")
+    log(f"✅ Supermemory sync complete: {success_count} success, {failed_count} failed")
+    return success_count
 
 def main():
     """Main execution"""
@@ -258,16 +306,25 @@ def main():
         # Determine mode
         repo_info = get_repo_info()
         auto_commit_mode = bool(GITHUB_TOKEN and repo_info)
+        supermemory_mode = bool(SUPERMEMORY_API_KEY)
         
+        log("\n📋 Modes:")
         if auto_commit_mode:
             repo_owner, repo_name = repo_info
-            log(f"🚀 Mode: AUTO-COMMIT (will commit to {repo_owner}/{repo_name})")
+            log(f"  ✅ AUTO-COMMIT (will commit to {repo_owner}/{repo_name})")
         else:
-            log("📝 Mode: LOCAL-ONLY (no token or not in git repo)")
+            log("  📝 LOCAL-ONLY")
             if not GITHUB_TOKEN:
-                log("   ℹ️  Add GITHUB_TOKEN to .env for auto-commit mode")
+                log("     ℹ️  Add GITHUB_TOKEN for auto-commit")
             if not repo_info:
-                log("   ℹ️  Run from a git repo with GitHub remote for auto-commit")
+                log("     ℹ️  Run from git repo for auto-commit")
+        
+        if supermemory_mode:
+            log(f"  ✅ SUPERMEMORY (knowledge graph enabled)")
+        else:
+            log("  ⚪ SUPERMEMORY (disabled - add API key to enable)")
+        
+        print()
         
         # 1. Fetch starred repos
         repos = fetch_all_starred_repos(GITHUB_USERNAME, GITHUB_TOKEN)
@@ -288,10 +345,11 @@ def main():
             if not success:
                 log("⚠️  Failed to commit to GitHub, but file is saved locally")
         
-        # 5. Sync to Supermemory (optional)
-        sync_to_supermemory(repos)
+        # 5. Sync to Supermemory (if enabled)
+        if supermemory_mode:
+            synced_count = sync_to_supermemory(repos, GITHUB_USERNAME)
         
-        log("🎉 Sync completed successfully!")
+        log("\n🎉 Sync completed successfully!")
         
         # Output summary
         print(f"\n📊 Summary:")
@@ -301,8 +359,17 @@ def main():
         if auto_commit_mode:
             print(f"   GitHub: https://github.com/{repo_owner}/{repo_name}/blob/main/starred-repos.md")
             print(f"   Raw URL: https://raw.githubusercontent.com/{repo_owner}/{repo_name}/main/starred-repos.md")
-        else:
-            print(f"   💡 Tip: Add GITHUB_TOKEN to auto-commit to your repo!")
+        
+        if supermemory_mode:
+            print(f"   Supermemory: {synced_count} repos synced to knowledge graph")
+            print(f"   Query your stars: https://supermemory.ai")
+        
+        if not auto_commit_mode or not supermemory_mode:
+            print(f"\n💡 Tips:")
+            if not auto_commit_mode:
+                print(f"   - Add GITHUB_TOKEN to enable auto-commit")
+            if not supermemory_mode:
+                print(f"   - Add SUPERMEMORY_API_KEY for semantic search")
         
     except Exception as e:
         log(f"❌ Error: {str(e)}")
