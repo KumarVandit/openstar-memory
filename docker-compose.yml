@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  openstar-memory:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+    # Run daily at 2 AM UTC
+    # For development, comment out and run manually
+    command: sh -c "while true; do python sync_stars.py && sleep 86400; done"
+    restart: unless-stopped
+
+  # Optional: MCP server service
+  mcp-server:
+    build: .
+    env_file:
+      - .env
+    command: python mcp_server.py
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
