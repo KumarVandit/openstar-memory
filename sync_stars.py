@@ -7,21 +7,54 @@ Fetches starred repos and syncs to markdown + Supermemory
 import os
 import json
 import base64
+import subprocess
+import re
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Tuple
 import requests
 
 # Configuration from environment
 GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-REPO_OWNER = os.environ.get("REPO_OWNER", GITHUB_USERNAME)
-REPO_NAME = os.environ.get("REPO_NAME", "openstar-memory")
 SUPERMEMORY_API_KEY = os.environ.get("SUPERMEMORY_API_KEY", "")
 SUPERMEMORY_API_URL = os.environ.get("SUPERMEMORY_API_URL", "https://api.supermemory.ai")
 
 def log(msg: str):
     """Timestamped logging"""
     print(f"[{datetime.utcnow().isoformat()}] {msg}")
+
+def get_repo_info() -> Tuple[str, str]:
+    """Auto-detect repo owner and name from git remote"""
+    try:
+        # Get git remote URL
+        result = subprocess.run(
+            ['git', 'config', '--get', 'remote.origin.url'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        remote_url = result.stdout.strip()
+        
+        # Parse owner/repo from various GitHub URL formats
+        # git@github.com:owner/repo.git
+        # https://github.com/owner/repo.git
+        # https://github.com/owner/repo
+        
+        patterns = [
+            r'github\.com[:/]([^/]+)/([^/.]+)(?:\.git)?$',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, remote_url)
+            if match:
+                owner, repo = match.groups()
+                log(f"Auto-detected repo: {owner}/{repo}")
+                return owner, repo
+        
+        raise ValueError(f"Could not parse GitHub repo from remote URL: {remote_url}")
+    
+    except subprocess.CalledProcessError:
+        raise ValueError("Not a git repository or no remote.origin.url configured")
 
 def fetch_all_starred_repos() -> List[Dict[str, Any]]:
     """Fetch all starred repositories with pagination"""
@@ -115,9 +148,9 @@ Total stars: {len(repos)}
     
     return md_content
 
-def update_github_file(content: str, file_path: str = "starred-repos.md"):
+def update_github_file(owner: str, repo: str, content: str, file_path: str = "starred-repos.md"):
     """Update or create file in GitHub repository"""
-    log(f"Updating {file_path} in {REPO_OWNER}/{REPO_NAME}...")
+    log(f"Updating {file_path} in {owner}/{repo}...")
     
     if not GITHUB_TOKEN:
         raise ValueError("GITHUB_TOKEN must be set")
@@ -128,7 +161,7 @@ def update_github_file(content: str, file_path: str = "starred-repos.md"):
     }
     
     # Check if file exists to get SHA
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
+    url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}"
     response = requests.get(url, headers=headers)
     
     sha = None
@@ -201,6 +234,9 @@ def main():
     log("🌟 OpenStar Memory - Starting sync...")
     
     try:
+        # Auto-detect repo from git remote
+        repo_owner, repo_name = get_repo_info()
+        
         # 1. Fetch starred repos
         repos = fetch_all_starred_repos()
         
@@ -212,7 +248,7 @@ def main():
         markdown_content = generate_markdown(repos)
         
         # 3. Update GitHub file
-        success = update_github_file(markdown_content)
+        success = update_github_file(repo_owner, repo_name, markdown_content)
         
         if not success:
             log("❌ Failed to update GitHub file")
@@ -226,8 +262,8 @@ def main():
         # Output summary
         print(f"\n📊 Summary:")
         print(f"   Total starred repos: {len(repos)}")
-        print(f"   Markdown file: https://github.com/{REPO_OWNER}/{REPO_NAME}/blob/main/starred-repos.md")
-        print(f"   Raw URL: https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/main/starred-repos.md")
+        print(f"   Markdown file: https://github.com/{repo_owner}/{repo_name}/blob/main/starred-repos.md")
+        print(f"   Raw URL: https://raw.githubusercontent.com/{repo_owner}/{repo_name}/main/starred-repos.md")
         
     except Exception as e:
         log(f"❌ Error: {str(e)}")
