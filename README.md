@@ -1,6 +1,6 @@
 # 🌟 OpenStar Memory
 
-**MCP Server & Daily Recipe** to sync your GitHub starred repositories into a searchable knowledge graph using [Supermemory](https://github.com/supermemoryai/supermemory).
+**MCP Server & Daily Sync** to track your GitHub starred repositories with zero configuration.
 
 Never lose track of why you starred that repo. Get instant context when you need it.
 
@@ -8,63 +8,76 @@ Never lose track of why you starred that repo. Get instant context when you need
 
 ## ✨ Features
 
-- 🔄 **Daily Auto-Sync** - Automatically fetches new starred repos every day
+- ⚡ **Zero Config** - Just your GitHub username, that's it!
+- 🔄 **Two Modes** - Local-only or auto-commit to GitHub
 - 📚 **Knowledge Graph** - Integrates with Supermemory for semantic search
 - 📝 **Markdown Export** - Clean, chronological markdown file
 - 🔧 **MCP Server** - Works with Claude Desktop, Cursor, and other MCP clients
 - 🐳 **Docker Ready** - Deploy locally or in containers
-- ⚙️ **Auto-Detection** - Automatically detects repo from git remote
-- 🚀 **Zero Config** - Just add your GitHub username and token!
+- 🔓 **No Token Needed** - Token only required for auto-commit
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.9+
-- GitHub Personal Access Token ([Generate here](https://github.com/settings/tokens))
-  - Required scopes: `repo` (or `public_repo`), `read:user`
-- Supermemory API Key (optional, for knowledge graph)
-
-### Installation
+### **The Simplest Way (No Token Required!)**
 
 ```bash
-# Clone the repository
+# Clone or fork the repo
 git clone https://github.com/YOUR_USERNAME/openstar-memory.git
 cd openstar-memory
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure (only 2 required values!)
+# Configure (ONLY 1 REQUIRED VALUE!)
 cp .env.example .env
-# Edit .env:
-#   GITHUB_USERNAME=your_username
-#   GITHUB_TOKEN=ghp_your_token
+# Edit .env and set: GITHUB_USERNAME=your_username
+
+# Run it!
+python sync_stars.py
 ```
 
-### Configuration
-
-Edit `.env` - **Only 2 values required:**
-
-```bash
-GITHUB_USERNAME=your_github_username
-GITHUB_TOKEN=ghp_your_token_here
-
-# Optional
-SUPERMEMORY_API_KEY=your_key  # Leave empty to skip
-```
-
-✨ **That's it!** The script automatically detects which repo it's running in.
+✨ **That's it!** Your `starred-repos.md` is generated locally!
 
 ---
 
-## 📖 Usage
+## 🔄 Two Modes
 
-### Run Manually
+### **Mode 1: Local-Only** (No Token)
+- ✅ Fetches public starred repos
+- ✅ Generates `starred-repos.md` locally
+- ✅ Perfect for quick lookups
+- ✅ No GitHub token needed
+
+**Setup:**
+```bash
+# .env
+GITHUB_USERNAME=your_username
+# That's it!
+```
+
+### **Mode 2: Auto-Commit** (Token Required)
+- ✅ Everything from Mode 1
+- ✅ Auto-commits to your GitHub repo
+- ✅ Daily automation ready
+- ✅ Raw URL for editors
+
+**Setup:**
+```bash
+# .env
+GITHUB_USERNAME=your_username
+GITHUB_TOKEN=ghp_your_token_here  # Get from github.com/settings/tokens
+```
+
+---
+
+## 📚 Usage
+
+### Run Locally
 
 ```bash
-# Sync starred repos and update markdown
+# Just generate markdown
 python sync_stars.py
 
 # Run MCP server
@@ -80,18 +93,15 @@ docker build -t openstar-memory .
 # Run sync
 docker run --env-file .env openstar-memory
 
-# Run with cron (daily at 2 AM)
+# Daily auto-sync
 docker-compose up -d
 ```
 
-### Run as Daily Cron Job (Local)
+### Daily Cron Job
 
 ```bash
-# Add to crontab
-crontab -e
-
 # Run every day at 2 AM
-0 2 * * * cd /path/to/openstar-memory && /usr/bin/python3 sync_stars.py >> /var/log/openstar-memory.log 2>&1
+0 2 * * * cd /path/to/openstar-memory && python sync_stars.py
 ```
 
 ---
@@ -100,7 +110,7 @@ crontab -e
 
 ### Claude Desktop
 
-Add to your `claude_desktop_config.json`:
+Add to `claude_desktop_config.json`:
 
 ```json
 {
@@ -109,17 +119,14 @@ Add to your `claude_desktop_config.json`:
       "command": "python",
       "args": ["/path/to/openstar-memory/mcp_server.py"],
       "env": {
-        "GITHUB_USERNAME": "your_username",
-        "GITHUB_TOKEN": "ghp_your_token"
+        "GITHUB_USERNAME": "your_username"
       }
     }
   }
 }
 ```
 
-### Cursor / Other MCP Clients
-
-Configure similarly using the MCP protocol.
+No token needed for MCP server either!
 
 ---
 
@@ -127,8 +134,8 @@ Configure similarly using the MCP protocol.
 
 ```
 openstar-memory/
-├── sync_stars.py          # Main sync script (auto-detects repo)
-├── mcp_server.py          # MCP server implementation
+├── sync_stars.py          # Main sync script (auto-detects repo, token optional)
+├── mcp_server.py          # MCP server (no token needed)
 ├── requirements.txt       # Python dependencies
 ├── Dockerfile             # Docker container
 ├── docker-compose.yml     # Docker Compose config
@@ -144,31 +151,20 @@ openstar-memory/
 The generated `starred-repos.md` looks like:
 
 ```markdown
-# GitHub Starred Repositories
+# YourUsername's GitHub Stars
 
-Last updated: 2026-02-01 22:52:00 UTC
+Last updated: 2026-02-01 23:24:00 UTC
 
 Total stars: 347
-
----
 
 ## Recently Starred
 
 ### [supermemoryai/supermemory](https://github.com/supermemoryai/supermemory)
 ⭐ 4,521 | 🔤 TypeScript | 📅 Starred: 2026-01-28
 
-Build your own second brain with supermemory. It's a ChatGPT for your bookmarks.
+Build your own second brain with supermemory...
 
-**Topics:** ai, knowledge-graph, memory, second-brain
-
----
-
-### [composiohq/composio](https://github.com/composiohq/composio)
-⭐ 12,345 | 🔤 Python | 📅 Starred: 2026-01-25
-
-Production Ready Toolset for AI Agents
-
-**Topics:** ai, agents, automation, tools
+**Topics:** ai, knowledge-graph, memory
 
 ---
 ```
@@ -177,14 +173,50 @@ Production Ready Toolset for AI Agents
 
 ## ❓ FAQ
 
+### Do I need a GitHub token?
+**No!** Token is only needed if you want auto-commit mode. Without a token, the script works perfectly fine and generates the markdown locally.
+
+### What are the rate limits?
+- **Without token:** 60 requests/hour (enough for ~6000 stars)
+- **With token:** 5000 requests/hour
+
+### Can I use this for any GitHub user?
+Yes! Just change `GITHUB_USERNAME` to any public GitHub user and run it.
+
 ### Why is repo detection automatic?
-The script reads your git remote URL and automatically determines where to commit the markdown. No manual configuration needed!
+The script reads your git remote URL and determines where to commit. No manual configuration needed!
 
-### Can I use this for multiple GitHub accounts?
-Yes! Just fork the repo for each account, configure different `.env` files, and run them separately.
+---
 
-### What if I want to commit to a different repo?
-Fork this repo, change the git remote, and the script will auto-detect the new destination.
+## 🎯 Use Cases
+
+1. **Quick Reference** - Generate markdown for any GitHub user instantly
+2. **Personal Knowledge Base** - Track YOUR stars with auto-commit
+3. **Research** - Analyze what repos people in your field star
+4. **Portfolio** - Showcase your curated list
+5. **MCP Integration** - Semantic search through stars in Claude/Cursor
+
+---
+
+## 🛠️ Advanced
+
+### Use for ANY GitHub User
+
+```bash
+# No need to fork! Just set any username
+GITHUB_USERNAME=torvalds python sync_stars.py
+
+# Generates: torvalds-starred-repos.md
+```
+
+### Multiple Users
+
+```bash
+# Generate for multiple users
+for user in torvalds gvanrossum dhh; do
+  GITHUB_USERNAME=$user python sync_stars.py
+done
+```
 
 ---
 
@@ -204,7 +236,7 @@ MIT License - see [LICENSE](LICENSE)
 
 - [Supermemory](https://github.com/supermemoryai/supermemory) - Knowledge graph backend
 - [Composio](https://composio.dev) - Multi-app automation platform
-- [GitHub API](https://docs.github.com/en/rest) - Repository data
+- [GitHub API](https://docs.github.com/en/rest) - Public API
 
 ---
 
