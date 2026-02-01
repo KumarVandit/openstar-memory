@@ -1,23 +1,44 @@
 version: '3.8'
 
 services:
+  # Daily sync service
   openstar-memory:
     build: .
-    env_file:
-      - .env
+    container_name: openstar-memory-sync
+    environment:
+      # Required: Your GitHub username
+      - GITHUB_USERNAME=${GITHUB_USERNAME}
+      
+      # Optional: Token for auto-commit mode (leave empty for local-only mode)
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      
+      # Optional: Supermemory integration
+      - SUPERMEMORY_API_KEY=${SUPERMEMORY_API_KEY:-}
+      - SUPERMEMORY_API_URL=${SUPERMEMORY_API_URL:-https://api.supermemory.ai}
     volumes:
-      - ./logs:/app/logs
-    # Run daily at 2 AM UTC
-    # For development, comment out and run manually
+      # Mount output directory to save markdown locally
+      - ./output:/app/output
+      # Mount git config if using auto-commit mode
+      - ./.git:/app/.git:ro
+    # Run daily at 2 AM UTC (86400 seconds = 24 hours)
     command: sh -c "while true; do python sync_stars.py && sleep 86400; done"
     restart: unless-stopped
 
-  # Optional: MCP server service
+  # Optional: MCP server service (no token needed)
   mcp-server:
     build: .
-    env_file:
-      - .env
+    container_name: openstar-memory-mcp
+    environment:
+      - GITHUB_USERNAME=${GITHUB_USERNAME}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     command: python mcp_server.py
     stdin_open: true
     tty: true
     restart: unless-stopped
+    profiles:
+      - mcp  # Only start with: docker-compose --profile mcp up
+
+# Usage:
+#   Local-only mode:  docker-compose up -d
+#   With MCP server:  docker-compose --profile mcp up -d
+#   One-time run:    docker-compose run --rm openstar-memory
