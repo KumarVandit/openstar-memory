@@ -1,6 +1,6 @@
 # 🌟 OpenStar Memory
 
-**MCP Server & Daily Sync** to track your GitHub starred repositories with zero configuration.
+**MCP Server & Daily Sync** to track your GitHub starred repositories with **Supermemory knowledge graph integration**.
 
 Never lose track of why you starred that repo. Get instant context when you need it.
 
@@ -9,8 +9,9 @@ Never lose track of why you starred that repo. Get instant context when you need
 ## ✨ Features
 
 - ⚡ **Zero Config** - Just your GitHub username, that's it!
-- 🔄 **Two Modes** - Local-only or auto-commit to GitHub
-- 📚 **Knowledge Graph** - Integrates with Supermemory for semantic search
+- 🧠 **Supermemory Integration** - Semantic search across your stars
+- 🔄 **Three Modes** - Local-only, auto-commit, or knowledge graph
+- 📚 **Rich Metadata** - Stars, language, topics, descriptions
 - 📝 **Markdown Export** - Clean, chronological markdown file
 - 🔧 **MCP Server** - Works with Claude Desktop, Cursor, and other MCP clients
 - 🐳 **Docker Ready** - Deploy locally or in containers
@@ -42,7 +43,7 @@ python sync_stars.py
 
 ---
 
-## 🔄 Two Modes
+## 🔄 Three Modes
 
 ### **Mode 1: Local-Only** (No Token)
 - ✅ Fetches public starred repos
@@ -69,6 +70,47 @@ GITHUB_USERNAME=your_username
 GITHUB_USERNAME=your_username
 GITHUB_TOKEN=ghp_your_token_here  # Get from github.com/settings/tokens
 ```
+
+### **Mode 3: Knowledge Graph** (Supermemory)
+- ✅ Everything from Mode 1 & 2
+- ✅ **Semantic search** across your stars
+- ✅ **AI-powered queries** - "Show me Python ML repos"
+- ✅ **Knowledge graph** - Explore connections
+- ✅ **Chat with your stars** via Supermemory
+
+**Setup:**
+```bash
+# .env
+GITHUB_USERNAME=your_username
+GITHUB_TOKEN=ghp_token  # Optional
+SUPERMEMORY_API_KEY=sm_your_key  # Get from console.supermemory.ai
+```
+
+---
+
+## 🧠 Supermemory Integration
+
+**What is Supermemory?**  
+[Supermemory](https://supermemory.ai) is an AI-powered second brain that creates a knowledge graph from your data.
+
+**What it does for your stars:**
+- 🔍 Semantic search - "Find my AI/ML repos"
+- 🤖 Natural language queries - "What did I star about LLMs?"
+- 🔗 Knowledge graph - See connections between repos
+- 💬 Chat interface - Ask questions about your starred repos
+- 🎯 Context-aware - Remembers what you've looked at
+
+**How to get API key:**
+1. Go to [console.supermemory.ai](https://console.supermemory.ai)
+2. Sign up / Log in
+3. Create new API key
+4. Add to `.env` as `SUPERMEMORY_API_KEY`
+
+**What gets synced:**
+- Repository name, description, URL
+- Programming language, topics, star count
+- When you starred it
+- Full metadata for semantic search
 
 ---
 
@@ -134,7 +176,7 @@ No token needed for MCP server either!
 
 ```
 openstar-memory/
-├── sync_stars.py          # Main sync script (auto-detects repo, token optional)
+├── sync_stars.py          # Main sync script with Supermemory integration
 ├── mcp_server.py          # MCP server (no token needed)
 ├── requirements.txt       # Python dependencies
 ├── Dockerfile             # Docker container
@@ -153,14 +195,14 @@ The generated `starred-repos.md` looks like:
 ```markdown
 # YourUsername's GitHub Stars
 
-Last updated: 2026-02-01 23:24:00 UTC
+Last updated: 2026-02-01 23:40:00 UTC
 
 Total stars: 347
 
 ## Recently Starred
 
 ### [supermemoryai/supermemory](https://github.com/supermemoryai/supermemory)
-⭐ 4,521 | 🔤 TypeScript | 📅 Starred: 2026-01-28
+⭐ 16,071 | 🔤 TypeScript | 📅 Starred: 2026-01-28
 
 Build your own second brain with supermemory...
 
@@ -176,6 +218,9 @@ Build your own second brain with supermemory...
 ### Do I need a GitHub token?
 **No!** Token is only needed if you want auto-commit mode. Without a token, the script works perfectly fine and generates the markdown locally.
 
+### Do I need Supermemory?
+**No!** Supermemory is optional. Without it, you get markdown and MCP server. With it, you get semantic search and knowledge graph.
+
 ### What are the rate limits?
 - **Without token:** 60 requests/hour (enough for ~6000 stars)
 - **With token:** 5000 requests/hour
@@ -183,18 +228,18 @@ Build your own second brain with supermemory...
 ### Can I use this for any GitHub user?
 Yes! Just change `GITHUB_USERNAME` to any public GitHub user and run it.
 
-### Why is repo detection automatic?
-The script reads your git remote URL and determines where to commit. No manual configuration needed!
+### How much does Supermemory cost?
+Supermemory has a free tier. Check [supermemory.ai/pricing](https://supermemory.ai/pricing) for details.
 
 ---
 
 ## 🎯 Use Cases
 
-1. **Quick Reference** - Generate markdown for any GitHub user instantly
-2. **Personal Knowledge Base** - Track YOUR stars with auto-commit
-3. **Research** - Analyze what repos people in your field star
-4. **Portfolio** - Showcase your curated list
-5. **MCP Integration** - Semantic search through stars in Claude/Cursor
+1. **Personal Knowledge Base** - Track YOUR stars with semantic search
+2. **Quick Reference** - Generate markdown for any GitHub user instantly
+3. **Research Tool** - Analyze what experts in your field star
+4. **AI Assistant** - Ask Claude about repos via MCP
+5. **Learning Tool** - Build a knowledge graph of your learning journey
 
 ---
 
@@ -218,6 +263,14 @@ for user in torvalds gvanrossum dhh; do
 done
 ```
 
+### Supermemory Queries (via web or API)
+
+Once synced, query your stars in Supermemory:
+- "Show me all Python machine learning repos I starred"
+- "What are my most starred TypeScript projects?"
+- "Find repos about RAG and LLMs"
+- "What did I star last month about databases?"
+
 ---
 
 ## 🤝 Contributing
@@ -234,7 +287,7 @@ MIT License - see [LICENSE](LICENSE)
 
 ## 🙏 Acknowledgments
 
-- [Supermemory](https://github.com/supermemoryai/supermemory) - Knowledge graph backend
+- [Supermemory](https://github.com/supermemoryai/supermemory) - AI-powered knowledge graph
 - [Composio](https://composio.dev) - Multi-app automation platform
 - [GitHub API](https://docs.github.com/en/rest) - Public API
 
